@@ -25,7 +25,7 @@ local options = {
     drawCurrentNode = true, -- Draws the current node
     autoPath = true, -- Automatically walks to the goal
     shouldfindhealth = true, -- Path to health
-    lookatpath = true, -- Look at where we are walking
+    lookatpath = false, -- Look at where we are walking
     smoothLookAtPath = true -- Set this to true to enable smooth look at path
 }
 
@@ -234,7 +234,7 @@ local function OnDraw()
 
     -- Draw current node
     if options.drawCurrentNode and currentPath then
-        draw.Color(255, 255, 255, 255)
+        draw.Color(255, 0, 0, 255)
 
         local currentNode = currentPath[currentNodeIndex]
         local currentNodePos = Vector3(currentNode.x, currentNode.y, currentNode.z)
@@ -262,6 +262,8 @@ local function OnCreateMove(userCmd)
         end
         return
     end
+
+    --if not gamerules.IsMatchTypeCasual() then return end -- return if not in casual.
 
     -- Update the current task
     if taskTimer:Run(0.7) then
