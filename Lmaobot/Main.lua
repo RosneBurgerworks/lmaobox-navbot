@@ -133,7 +133,7 @@ end
 
 local function OnDraw()
     draw.SetFont(Fonts.Verdana)
-    draw.Color(255, 0, 0, 255)
+    draw.Color(22, 22, 25, 255)
 
     local me = entities.GetLocalPlayer()
     if not me then return end
@@ -145,13 +145,13 @@ local function OnDraw()
     -- Memory usage
     if options.memoryUsage then
         local memUsage = collectgarbage("count")
-        draw.Text(20, currentY, string.format("Memory usage: %.2f MB", memUsage / 1024))
+        draw.Text(20, currentY, string.format("%.2f GB", memUsage / 1024))
         currentY = currentY + 20
     end
 
     -- Auto path informaton
     if options.autoPath then
-        draw.Text(20, currentY, string.format("Current Node: %d", currentNodeIndex))
+        draw.Text(20, currentY, string.format("%d", currentNodeIndex))
         currentY = currentY + 20
     end
 
@@ -172,7 +172,7 @@ local function OnDraw()
             draw.FilledRect(x - 4, y - 4, x + 4, y + 4)  -- Draw a small square centered at (x, y)
 
             -- Node IDs
-            draw.Text(screenPos[1], screenPos[2] + 10, tostring(id))
+           -- draw.Text(screenPos[1], screenPos[2] + 10, tostring(id))
 
             ::continue::
         end
@@ -530,5 +530,5 @@ Commands.Register("pf_auto", function (args)
     print("Auto path: " .. tostring(options.autoPath))
 end)
 
-Notify.Alert("Lmaobot loaded!")
+Notify.Alert("Narrow's navbot loaded!")
 LoadNavFile()
