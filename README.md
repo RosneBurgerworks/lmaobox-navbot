@@ -21,7 +21,4 @@ Go to the Lua tab in the menu and load "Lmaobot.lua"
 
 Enjoy NavBot on LMAOBox!
 
-### Navigation Meshes
-You need nav meshes for your navbot to move, download the [navigation meshes](https://github.com/RosneBurgerworks/rosnebot-database/tree/master/nav%20meshes) and put them in ``tf/maps`` folder located in your TF2 installation.
-
 # NOTE: SOME LUAS BREAK THE NAVBOT
