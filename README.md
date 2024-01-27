@@ -1,24 +1,23 @@
-# LMAOBox-Navbot
-Behold the masterpiece of pathfinding and navigation brilliance, brought to you by the unparalleled coding prowess of none other than the illustrious Narrow.
+#LMAOBox-Navbot
+Presenting the marvel of pathfinding and navigation brilliance, meticulously crafted through the exceptional coding acumen of the renowned Narrow.
 
-Fully self-coded by: Narrow
+Completely self-coded by: Narrow
 
-# How to use
-First, go to https://nodejs.org/ and download and install the stable version of Node.JS
+#Operational Guidelines
+Commence by navigating to https://nodejs.org/ and procuring the stable version of Node.JS, subsequently installing it with precision.
 
-Next, go to releases and download the source code (zip) and unzip it to any place you want.
+Proceed to the releases section, acquire the source code (zip), and bestow it upon a location of your choosing.
 
-With the Node.JS command prompt as your humble servant, command it to execute:
+With the Node.JS command prompt at your beck and call, command its execution prowess thus:
 ```
 npm install luabundle
 ```
+Upon successful installation, invoke Bundle.bat, and upon its completion, execute BundleAndDeploy.bat.
 
-Once it has installed, run Bundle.bat and after it finishes run BundleAndDeploy.bat
+Initiate TF2, introduce LMAOBox (non-beta build) into the equation, and traverse a virtual landscape.
 
-Start TF2, inject LMAOBox (not beta build), and go into a map.
+Navigate to the Lua tab within the menu and load "Lmaobot.lua".
 
-Go to the Lua tab in the menu and load "Lmaobot.lua"
+Indulge in the experience of NavBot on LMAOBox!
 
-Enjoy NavBot on LMAOBox!
-
-# NOTE: SOME LUAS BREAK THE NAVBOT
+# REMARK: CERTAIN LUAS MAY INTERRUPT THE FUNCTIONALITY OF NAVBOT
