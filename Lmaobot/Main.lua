@@ -20,9 +20,9 @@ Log.Level = 0
 
 local options = {
     memoryUsage = true, -- Shows memory usage in the top left corner
-    drawNodes = false, -- Draws all nodes on the map
+    drawNodes = true, -- Draws all nodes on the map
     drawPath = true, -- Draws the path to the current goal
-    drawCurrentNode = false, -- Draws the current node
+    drawCurrentNode = true, -- Draws the current node
     autoPath = true, -- Automatically walks to the goal
     shouldfindhealth = true, -- Path to health
     lookatpath = false, -- Look at where we are walking
@@ -103,30 +103,33 @@ local function NormalizeVector(v)
     return Vector3(v.x / length, v.y / length, v.z / length)
 end
 
-local function arrowPathArrow2(startPos, endPos, width)
-    if not (startPos and endPos) then return nil, nil end
+local function Normalize(vec)
+    local length = math.sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z)
+    return Vector3(vec.x / length, vec.y / length, vec.z / length)
+end
 
-    local direction = endPos - startPos
-    local length = direction:Length()
-    if length == 0 then return nil, nil end
-    direction = NormalizeVector(direction)
-
-    local perpDir = Vector3(-direction.y, direction.x, 0)
-    local leftBase = startPos + perpDir * width
-    local rightBase = startPos - perpDir * width
-
-    local screenStartPos = client.WorldToScreen(startPos)
-    local screenEndPos = client.WorldToScreen(endPos)
-    local screenLeftBase = client.WorldToScreen(leftBase)
-    local screenRightBase = client.WorldToScreen(rightBase)
-
-    if screenStartPos and screenEndPos and screenLeftBase and screenRightBase then
-        draw.Line(screenStartPos[1], screenStartPos[2], screenEndPos[1], screenEndPos[2])
-        draw.Line(screenLeftBase[1], screenLeftBase[2], screenEndPos[1], screenEndPos[2])
-        draw.Line(screenRightBase[1], screenRightBase[2], screenEndPos[1], screenEndPos[2])
+local function L_line(start_pos, end_pos, secondary_line_size)
+    if not (start_pos and end_pos) then
+        return
     end
-
-    return leftBase, rightBase
+    local direction = end_pos - start_pos
+    local direction_length = direction:Length()
+    if direction_length == 0 then
+        return
+    end
+    local normalized_direction = Normalize(direction)
+    local perpendicular = Vector3(normalized_direction.y, -normalized_direction.x, 0) * secondary_line_size
+    local w2s_start_pos = client.WorldToScreen(start_pos)
+    local w2s_end_pos = client.WorldToScreen(end_pos)
+    if not (w2s_start_pos and w2s_end_pos) then
+        return
+    end
+    local secondary_line_end_pos = start_pos + perpendicular
+    local w2s_secondary_line_end_pos = client.WorldToScreen(secondary_line_end_pos)
+    if w2s_secondary_line_end_pos then
+        draw.Line(w2s_start_pos[1], w2s_start_pos[2], w2s_end_pos[1], w2s_end_pos[2])
+        draw.Line(w2s_start_pos[1], w2s_start_pos[2], w2s_secondary_line_end_pos[1], w2s_secondary_line_end_pos[2])
+    end
 end
 
 --[[ Callbacks ]]
@@ -193,8 +196,9 @@ local function OnDraw()
             local screenPos2 = client.WorldToScreen(node2Pos)
             if not screenPos1 or not screenPos2 then goto continue end
 
-            draw.Line(screenPos1[1], screenPos1[2], screenPos2[1], screenPos2[2])
-
+            if node1Pos and node2Pos then
+                L_line(node1Pos, node2Pos, 22)  -- Adjust the size for the perpendicular segment as needed
+            end
             ::continue::
         end
     end
@@ -208,7 +212,7 @@ local function OnDraw()
 
         local screenPos = client.WorldToScreen(currentNodePos)
         if screenPos then
-            Draw3DBox(20, currentNodePos)
+            Draw3DBox(22, currentNodePos)
             draw.Text(screenPos[1], screenPos[2], tostring(currentNodeIndex))
         end
     end
@@ -266,9 +270,8 @@ local function OnCreateMove(userCmd)
                 if options.smoothLookAtPath then
                     local currentAngles = userCmd.viewangles
                     local deltaAngles = {x = angles.x - currentAngles.x, y = angles.y - currentAngles.y}
-    
-                    while deltaAngles.y > 180 do deltaAngles.y = deltaAngles.y - 360 end
-                    while deltaAngles.y < -180 do deltaAngles.y = deltaAngles.y + 360 end
+
+                    deltaAngles.y = math.fmod(deltaAngles.y + 180, 360) - 180
 
                     angles = EulerAngles(currentAngles.x + deltaAngles.x * 0.5, currentAngles.y + deltaAngles.y * smoothFactor, 0)
                 end
@@ -280,8 +283,10 @@ local function OnCreateMove(userCmd)
         local dist = (myPos - currentNodePos):Length()
         if dist < 22 then
             currentNodeTicks = 0
+            for i = #currentPath, currentNodeIndex + 1, -1 do
+                table.remove(currentPath, i)
+            end
             currentNodeIndex = currentNodeIndex - 1
-            table.remove(currentPath)
             if currentNodeIndex < 1 then
                 Navigation.ClearPath()
                 Log:Info("Reached end of path")
@@ -305,7 +310,10 @@ local function OnCreateMove(userCmd)
                 end
             end
 
-            Lib.TF2.Helpers.WalkTo(userCmd, me, currentNodePos)
+            if userCmd:GetForwardMove() == 0
+            and userCmd.GetSideMove() == 0 then
+                Lib.TF2.Helpers.WalkTo(userCmd, me, currentNodePos)
+            end
         end
 
         -- Jump if stuck
