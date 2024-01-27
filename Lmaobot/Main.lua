@@ -29,7 +29,7 @@ local options = {
     smoothLookAtPath = true -- Set this to true to enable smooth look at path
 }
 
-local smoothFactor = 0.05
+local smoothFactor = 50
 local currentNodeIndex = 1
 local currentNodeTicks = 0
 
