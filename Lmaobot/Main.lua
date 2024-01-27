@@ -13,7 +13,7 @@ local libLoaded, lnxLib = pcall(require, "lnxLib")
 Lib.Utils.UnloadPackages("Lmaobot")
 
 local Notify, FS, Fonts, Commands, Timer = Lib.UI.Notify, Lib.Utils.FileSystem, Lib.UI.Fonts, Lib.Utils.Commands, Lib.Utils.Timer
-local Log = Lib.Utils.Logger.new("Lmaobot")
+local Log = Lib.Utils.Logger.new("Narrow's navbot for LMAOBox")
 Log.Level = 0
 
 --[[ Variables ]]
