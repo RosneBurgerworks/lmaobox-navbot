@@ -62,6 +62,22 @@ function Navigation.RemoveConnection(nodeA, nodeB)
 	end
 end
 
+function Navigation.RemoveNode(nodeToRemove)
+    -- Remove connections to the node from other nodes
+    for _, node in pairs(Navigation.nodes) do
+        Navigation.RemoveConnection(node, nodeToRemove)
+    end
+
+    -- Remove the node from the nodes table
+    for i, node in pairs(Navigation.nodes) do
+        if node == nodeToRemove then
+            print("Removing node " .. nodeToRemove.id)
+            table.remove(Navigation.nodes, i)
+            break
+        end
+    end
+end
+
 ---@param navFile string
 function Navigation.LoadFile(navFile)
     -- Read nav file
