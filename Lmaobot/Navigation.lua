@@ -6,18 +6,7 @@ local SourceNav = require("Lmaobot.SourceNav")
 local AStar = require("Lmaobot.A-Star")
 local Lib, Log = Common.Lib, Common.Log
 
-local GRID_SIZE = 100  -- Adjust this based on your world size and node density
-local SpatialHashTable = {}  -- Spatial hash table
-
 local FS = Lib.Utils.FileSystem
-
--- Function to compute hash key for a position
-local function ComputeHashKey(x, y, z)
-    local cellX = math.floor(x / GRID_SIZE)
-    local cellY = math.floor(y / GRID_SIZE)
-    local cellZ = math.floor(z / GRID_SIZE)
-    return cellX .. "_" .. cellY .. "_" .. cellZ
-end
 
 local function DistTo(a, b)
     return math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)
@@ -43,6 +32,7 @@ function Navigation.GetNodes()
 end
 
 ---@return Node[]|nil
+---@return Node[]|nil
 function Navigation.GetCurrentPath()
     return CurrentPath
 end
@@ -60,7 +50,7 @@ end
 -- Removes the connection between two nodes (if it exists)
 function Navigation.RemoveConnection(nodeA, nodeB)
     for dir = 1, 4 do
-        local conDir = nodeA.c[dir]
+		local conDir = nodeA.c[dir]
         for i, con in pairs(conDir.connections) do
             if con == nodeB.id then
                 print("Removing connection between " .. nodeA.id .. " and " .. nodeB.id)
@@ -69,53 +59,83 @@ function Navigation.RemoveConnection(nodeA, nodeB)
                 break
             end
         end
-    end
+	end
 end
 
 ---@param navFile string
 function Navigation.LoadFile(navFile)
-    -- Read nav file
-    local rawNavData = FS.Read("tf/" .. navFile)
-    assert(rawNavData, "Failed to read nav file: " .. navFile)
-
-    -- Parse nav file
-    local navData = SourceNav.parse(rawNavData)
-    Log:Info("Parsed %d areas", #navData.areas)
-
-    -- Convert nav data to usable format
-    local navNodes = {}
-    -- Clear existing hash table
-    SpatialHashTable = {}
-
-    for _, area in ipairs(navData.areas) do
-        local cX = (area.north_west.x + area.south_east.x) // 2
-        local cY = (area.north_west.y + area.south_east.y) // 2
-        local cZ = (area.north_west.z + area.south_east.z) // 2
-
-        local node = { x = cX, y = cY, z = cZ, id = area.id, c = area.connections }
-        navNodes[area.id] = node
-
-        -- Insert nodes into hash table
-        local hashKey = ComputeHashKey(node.x, node.y, node.z)
-        if not SpatialHashTable[hashKey] then
-            SpatialHashTable[hashKey] = {}
+    -- Internal function to attempt to read and parse the nav file
+    local function tryLoadNavFile(navFilePath)
+        local file = io.open(navFilePath, "rb")
+        if not file then
+            return nil, "File not found"
         end
-        table.insert(SpatialHashTable[hashKey], node)
+
+        local content = file:read("*a")
+        file:close()
+
+        local navData = SourceNav.parse(content)
+        if not navData or #navData.areas == 0 then
+            return nil, "Failed to parse nav file or no areas found."
+        end
+
+        return navData
     end
 
+    -- Construct the full path to the nav file
+    local fullPath = "tf/" .. navFile
+    local navData, error = tryLoadNavFile(fullPath)
+
+    -- Attempt to generate the nav file if it's not found
+    if not navData and error == "File not found" then
+        -- Remove convar protections and generate the nav file
+        client.RemoveConVarProtection("sv_cheats")
+        client.RemoveConVarProtection("nav_generate")
+        client.SetConVar("sv_cheats", "1")
+        client.Command("nav_generate", true)
+        Log:Info("Generating nav file. Please wait...")
+
+        -- Wait a moment to allow nav file generation
+        local navGenerationDelay = 5  -- in seconds
+        local startTime = os.time()
+        repeat
+            if os.time() - startTime > navGenerationDelay then
+                break
+            end
+        until false
+
+        -- Retry loading the nav file
+        navData, error = tryLoadNavFile(fullPath)
+        if not navData then
+            Log:Error("Failed to load or parse generated nav file: " .. error)
+            return
+        end
+    elseif not navData then
+        Log:Error(error)
+        return
+    end
+
+    -- Process the nav data
+    Log:Info("Parsed %d areas from nav file.", #navData.areas)
+    local navNodes = {}
+    for _, area in ipairs(navData.areas) do
+        local cX = (area.north_west.x + area.south_east.x) / 2
+        local cY = (area.north_west.y + area.south_east.y) / 2
+        local cZ = (area.north_west.z + area.south_east.z) / 2
+        navNodes[area.id] = { x = cX, y = cY, z = cZ, id = area.id, c = area.connections }
+    end
+    navNodes[0] = { x = 0, y = 0, z = 0, id = 0, c = {} }
     Navigation.SetNodes(navNodes)
 end
+
 
 ---@param pos Vector3|{ x:number, y:number, z:number }
 ---@return Node
 function Navigation.GetClosestNode(pos)
-    local hashKey = ComputeHashKey(pos.x, pos.y, pos.z)
-    local nodesToCheck = SpatialHashTable[hashKey] or {}
-
     local closestNode = nil
     local closestDist = math.huge
 
-    for _, node in pairs(nodesToCheck) do
+    for _, node in pairs(Nodes) do
         local dist = DistTo(node, pos)
         if dist < closestDist then
             closestNode = node
@@ -130,19 +150,19 @@ end
 ---@param node Node
 ---@param nodes Node[]
 local function GetAdjacentNodes(node, nodes)
-    local adjacentNodes = {}
+	local adjacentNodes = {}
 
-    for dir = 1, 4 do
-        local conDir = node.c[dir]
+	for dir = 1, 4 do
+		local conDir = node.c[dir]
         for _, con in pairs(conDir.connections) do
             local conNode = nodes[con]
             if conNode and node.z + 70 > conNode.z then
                 table.insert(adjacentNodes, conNode)
             end
         end
-    end
+	end
 
-    return adjacentNodes
+	return adjacentNodes
 end
 
 ---@param startNode Node
