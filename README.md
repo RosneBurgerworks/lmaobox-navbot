@@ -1,20 +1,19 @@
 # LMAOBox-Navbot
-Pathfinding and navigation bot made with LMAOBox Lua.
 
-Support: https://dsc.gg/rosnehook
+Behold the masterpiece of pathfinding and navigation brilliance, brought to you by the unparalleled coding prowess of none other than the illustrious Narrow.
 
-Credits for original code: Inx00
+Self-coded by: Narrow
 
 # How to use
-First, go to https://nodejs.org/ and download and install the stable version of Node.JS
+Firstly, deign to visit https://nodejs.org/ to grace your presence with the installation of the stable Node.JS version.
 
-Next, go to releases and download the source code (zip) and unzip it to any place you want.
+Then, go over to the releases section, where you'll download the source code (zip) and unzip it upon your chosen domain.
 
-After that, you open the **Node.JS command prompt** and execute
+With the Node.JS command prompt as your humble servant, command it to execute:
+Copy code
 ```
 npm install luabundle
 ```
-
 Once it has installed, run Bundle.bat and after it finishes run BundleAndDeploy.bat
 
 Start TF2, inject LMAOBox (not beta build), and go into a map.
