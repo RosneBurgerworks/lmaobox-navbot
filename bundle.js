@@ -16,3 +16,4 @@ fs.writeFile('Lmaobot.lua', bundledLua, err => {
 });
 
 console.log('Library bundle created');
+console.log('Made by Narrow.');
