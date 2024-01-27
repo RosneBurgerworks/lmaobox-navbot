@@ -23,10 +23,11 @@ local options = {
     drawNodes = true, -- Draws all nodes on the map
     drawPath = true, -- Draws the path to the current goal
     drawCurrentNode = true, -- Draws the current node
+    lookatpath = false, -- Look at where we are walking
+    smoothLookAtPath = true, -- Set this to true to enable smooth look at path
     autoPath = true, -- Automatically walks to the goal
     shouldfindhealth = true, -- Path to health
-    lookatpath = true, -- Look at where we are walking
-    smoothLookAtPath = true -- Set this to true to enable smooth look at path
+    SelfHealTreshold = 45, -- Health percentage to start looking for healthPacks
 }
 
 local smoothFactor = 0.05
@@ -40,6 +41,8 @@ local Tasks = table.readOnly {
     None = 0,
     Objective = 1,
     Health = 2,
+    Follow = 3,
+    Medic = 4,
 }
 
 local currentTask = Tasks.Objective
@@ -153,10 +156,9 @@ local function OnDraw()
     end
 
     --Draw all nodes and sub-nodes with connections
+    local navNodes = Navigation.GetNodes()
     if options.drawNodes then
-        local navNodes = Navigation.GetNodes()
         draw.Color(0, 255, 0, 255)  -- Color for main nodes
-        
         -- Iterate through each main node
         for id, node in pairs(navNodes) do
             local nodePos = Vector3(node.x, node.y, node.z)
@@ -173,17 +175,17 @@ local function OnDraw()
             if node.subnodes then
                 draw.Color(255, 0, 0, 255)  -- Color for sub-nodes
                 for _, subnode in ipairs(node.subnodes) do
-                    local subNodePos = subnode.pos
+                    local subNodePos = Vector3(subnode.x, subnode.y, subnode.z)
                     local subScreenPos = client.WorldToScreen(subNodePos)
                     if not subScreenPos then goto continue_sub_node end
 
-                    draw.FilledRect(subScreenPos[1] - 2, subScreenPos[2] - 2, subScreenPos[1] + 2, subScreenPos[2] + 2)  -- Draw a smaller square for sub-node
+                    draw.FilledRect(subScreenPos[1] - 1, subScreenPos[2] - 1, subScreenPos[1] + 1, subScreenPos[2] + 1)  -- Draw a smaller square for sub-node
 
                     -- Draw connections between sub-nodes
                     if subnode.neighbors then
                         draw.Color(0, 0, 255, 255)  -- Color for connections
                         for _, neighbor in ipairs(subnode.neighbors) do
-                            local neighborPos = neighbor.point.pos
+                            local neighborPos = Vector3(neighbor.point.x, neighbor.point.y, neighbor.point.z)
                             local neighborScreenPos = client.WorldToScreen(neighborPos)
                             if neighborScreenPos then
                                 draw.Line(subScreenPos[1], subScreenPos[2], neighborScreenPos[1], neighborScreenPos[2])  -- Draw line for connection
@@ -234,7 +236,7 @@ local function OnDraw()
 
     -- Draw current node
     if options.drawCurrentNode and currentPath then
-        draw.Color(255, 255, 255, 255)
+        draw.Color(255, 0, 0, 255)
 
         local currentNode = currentPath[currentNodeIndex]
         local currentNodePos = Vector3(currentNode.x, currentNode.y, currentNode.z)
@@ -247,7 +249,13 @@ local function OnDraw()
     end
 end
 
+local function isVisible(fromPos, toPos)
+    local trace = engine.TraceLine(fromPos, toPos, MASK_SHOT_HULL)
+    return trace.fraction == 1.0  -- True if the line trace did not hit any obstacles
+end
+
 local movementChangeTimer = 66
+local previousTask = nil
 
 ---@param userCmd UserCmd
 local function OnCreateMove(userCmd)
@@ -263,23 +271,26 @@ local function OnCreateMove(userCmd)
         return
     end
 
-    -- Update the current task
+    --if not gamerules.IsMatchTypeCasual() then return end -- return if not in casual.
+
+    -- emergency healthpack task
     if taskTimer:Run(0.7) then
         -- make sure we're not being healed by a medic before running health logic
-        if me:GetHealth() < 75 and not me:InCond(TFCond_Healing) then
+        if (me:GetHealth() / me:GetMaxHealth()) * 100 < options.SelfHealTreshold and not me:InCond(TFCond_Healing) then
             if currentTask ~= Tasks.Health and options.shouldfindhealth then
                 Log:Info("Switching to health task")
                 Navigation.ClearPath()
+                previousTask = currentTask
             end
 
             currentTask = Tasks.Health
         else
-            if currentTask ~= Tasks.Objective then
-                Log:Info("Switching to objective task")
+            if previousTask and currentTask ~= previousTask then
+                Log:Info("Switching back to previous task")
                 Navigation.ClearPath()
+                currentTask = previousTask
+                previousTask = nil
             end
-
-            currentTask = Tasks.Objective
         end
     end
 
@@ -322,19 +333,15 @@ local function OnCreateMove(userCmd)
 
         local dist = (myPos - currentNodePos):Length()
         if dist < 22 then
-            local viewPos = me:GetAbsOrigin() + Vector3(0, 0, 72)
-            local trace = engine.TraceLine(viewPos, currentNodePos, MASK_SHOT_HULL)
-            if trace.fraction > 0.8 then
-                currentNodeTicks = 0
-                for i = #currentPath, currentNodeIndex + 1, -1 do
-                    table.remove(currentPath, i)
-                end
-                currentNodeIndex = currentNodeIndex - 1
-                if currentNodeIndex < 1 then
-                    Navigation.ClearPath()
-                    Log:Info("Reached end of path")
-                    currentTask = Tasks.None
-                end
+            currentNodeTicks = 0
+            for i = #currentPath, currentNodeIndex + 1, -1 do
+                table.remove(currentPath, i)
+            end
+            currentNodeIndex = currentNodeIndex - 1
+            if currentNodeIndex < 1 then
+                Navigation.ClearPath()
+                Log:Info("Reached end of path")
+                currentTask = Tasks.None
             end
         else
             currentNodeTicks = currentNodeTicks + 1
@@ -346,32 +353,21 @@ local function OnCreateMove(userCmd)
             local closestDist = dist
 
             -- Iterate over all nodes in the path, excluding the last node
-            for i = 1, #currentPath - 1 do
-                -- If the closest node is not the current node, skip to it
-   
-                -- Skip the current node
-                if i == currentNodeIndex then
-                    goto continue
-                end
-
-                local viewPos = me:GetAbsOrigin() + Vector3(0, 0, 72)
-                local trace1 = engine.TraceLine(viewPos, currentNodePos, MASK_SHOT_HULL)
-
-                if trace1.fraction == 1.0 then goto continue end --visibility check
-
+            for i = currentNodeIndex + 1, #currentPath do  -- Start from the next node
                 local node = currentPath[i]
                 local nodePos = Vector3(node.x, node.y, node.z)
                 local nodeDist = (myPos - nodePos):Length()
 
-                -- If this node is closer, update closest node variables
-                if nodeDist < closestDist then
+                local viewPos = me:GetAbsOrigin() + Vector3(0, 0, 72)  -- Eye position
+
+                -- If the node is visible and closer, update closest node variables
+                if isVisible(viewPos, nodePos) and nodeDist < closestDist then
                     closestNodeIndex = i
                     closestNode = node
                     closestNodePos = nodePos
                     closestDist = nodeDist
+                    break  -- Break the loop as we prefer the closest visible node
                 end
-
-                ::continue::
             end
 
             if closestNodeIndex ~= currentNodeIndex then
@@ -380,9 +376,10 @@ local function OnCreateMove(userCmd)
                 currentNode = closestNode
                 currentNodePos = closestNodePos
                 dist = closestDist
+            else
+                -- No closer visible node found, continue towards the current node
+                Lib.TF2.Helpers.WalkTo(userCmd, me, currentNodePos)
             end
-
-            Lib.TF2.Helpers.WalkTo(userCmd, me, currentNodePos)
         end
 
         -- Jump if stuck
@@ -495,6 +492,11 @@ local function OnCreateMove(userCmd)
                     end
                 end
             end
+        elseif currentTask == Tasks.Follow then
+
+
+        elseif currentTask == Tasks.Medic then
+
         else
             Log:Debug("Unknown task: %d", currentTask)
             return
