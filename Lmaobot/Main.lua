@@ -46,7 +46,7 @@ local Tasks = table.readOnly {
     Medic = 5,
 }
 
-local currentTask = Tasks.Objective
+local currentTask = Tasks.Follow
 local taskTimer = Timer.new()
 local Math = lnxLib.Utils.Math
 local WPlayer = lnxLib.TF2.WPlayer
@@ -236,26 +236,6 @@ local function OnDraw()
         local secondLastNode = currentPath[#currentPath - 1]
         local secondLastNodePos = Vector3(secondLastNode.x, secondLastNode.y, secondLastNode.z)
         L_line(myPos, secondLastNodePos, 22)
-
-        -- Draw lines between circle points
-        if circlePoints then
-            draw.Color(255, 255, 255, 255)
-
-            -- Iterate over all points in the circlePoints table, excluding the last point
-            for i = 1, #circlePoints - 1 do
-                local point1 = circlePoints[i]
-                local point2 = circlePoints[i + 1]
-
-                local screenPos1 = client.WorldToScreen(point1)
-                local screenPos2 = client.WorldToScreen(point2)
-                if not screenPos1 or not screenPos2 then goto continue end
-
-                if point1 and point2 then
-                    draw.Line(screenPos1.x, screenPos1.y, screenPos2.x, screenPos2.y)  -- Draw a line between point1 and point2
-                end
-                ::continue::
-            end
-        end
     end
 
     -- Draw current node
@@ -293,6 +273,25 @@ local function isVisible(fromPos, toPos)
     local trace = engine.TraceLine(fromPos, toPos, MASK_SHOT_HULL)
     return trace.fraction == 1.0  -- True if the line trace did not hit any obstacles
 end
+
+local function FindClosestTeammate(me)
+    local teammates = entities.FindByClass("CTFPlayer")
+    local closestTeammate = nil
+    local minDist = math.huge
+
+    for i, teammate in pairs(teammates) do
+        if teammate:GetIndex() ~= me:GetIndex() and teammate:GetTeamNumber() == me:GetTeamNumber() and teammate:IsAlive() then
+            local dist = (teammate:GetAbsOrigin() - me:GetAbsOrigin()):Length()
+            if dist < minDist then
+                minDist = dist
+                closestTeammate = teammate
+            end
+        end
+    end
+
+    return closestTeammate
+end
+
 
 -- Initialize a variable to keep track of the last skipped index
 local lastSkippedIndex = 0
@@ -379,7 +378,7 @@ local function OnCreateMove(userCmd)
         end
 
         local dist = (myPos - currentNodePos):Length()
-        if dist < 22 then
+        if dist < 27 then
             currentNodeTicks = 0
             for i = #currentPath, currentNodeIndex + 1, -1 do
                 table.remove(currentPath, i)
@@ -533,7 +532,7 @@ local function OnCreateMove(userCmd)
                 end
             else
                 Log:Warn("Unsupported Gamemode, try CTF or PL")
-                return
+                
             end
 
             -- Ensure objectives is a table before iterating
@@ -629,8 +628,29 @@ local function OnCreateMove(userCmd)
                 end
             end
         elseif currentTask == Tasks.Follow then
-
-        elseif currentTask == Tasks.Medic then
+            local closestTeammate = FindClosestTeammate(me)
+            if closestTeammate then
+                local goalNode = Navigation.GetClosestNode(closestTeammate:GetAbsOrigin())
+                if not goalNode then
+                    Log:Warn("Could not find node near the closest teammate")
+                    return
+                end
+        
+                -- Check if a new path needs to be generated
+                if not currentPath or currentPath[#currentPath].id ~= goalNode.id then
+                    local startNode = Navigation.GetClosestNode(myPos)
+                    if startNode then
+                        Navigation.FindPath(startNode, goalNode)
+                        currentPath = Navigation.GetCurrentPath()
+                        currentNodeIndex = #currentPath
+                    else
+                        Log:Warn("Could not find a start node near the bot's position.")
+                    end
+                end
+            else
+                Log:Warn("No teammates found.")
+            end
+        --elseif currentTask == Tasks.Medic then
 
         else
             Log:Debug("Unknown task: %d", currentTask)
