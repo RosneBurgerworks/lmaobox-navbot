@@ -345,7 +345,11 @@ local function OnCreateMove(userCmd)
     if currentPath then
         -- Move along path
         if userCmd:GetForwardMove() ~= 0 or userCmd:GetSideMove() ~= 0 then
-            Navigation.ClearPath()
+            currentNodeTicks = currentNodeTicks + 1
+            if currentNodeTicks > 66 then
+                Navigation.ClearPath()
+                currentNodeTicks = 0
+            end
             currentNodeTicks = 0
             return
         end
@@ -453,7 +457,7 @@ local function OnCreateMove(userCmd)
                 -- Trigger repathing logic here if necessary (depends on the rest of your code)
             else
                 -- Path to the next node is not blocked, but the entity is still stuck
-                if currentNodeTicks >= 132 then
+                if currfentNodeTicks >= 132 then
                     traceResult1 = engine.TraceHull(myPos, currentNodePos, minVector, maxVector, MASK_SHOT_HULL)
 
                     if traceResult1.fraction < 0.9 then
@@ -495,6 +499,7 @@ local function OnCreateMove(userCmd)
             end
         end
     else
+        -- Generate new path
         local startNode = Navigation.GetClosestNode(myPos)
         local goalNode = nil
         local entity = nil
@@ -532,18 +537,21 @@ local function OnCreateMove(userCmd)
             end
 
             -- Ensure objectives is a table before iterating
-            if objectives and type(objectives) == "table" and #objectives > 0 then
+            if objectives and type(objectives) ~= "table" then
+                Log:Info("No objectives available")
+                return
+            end
+
+            -- Iterate through objectives and find the closest one
+            if objectives then
                 local closestDist = math.huge
                 for idx, ent in pairs(objectives) do
-                    local objectiveNode = Navigation.GetClosestNode(ent:GetAbsOrigin())
-                    if objectiveNode then
-                        local dist = (myPos - ent:GetAbsOrigin()):Length()
-                        if dist < closestDist then
-                            closestDist = dist
-                            goalNode = objectiveNode
-                            entity = ent
-                            Log:Info("Found objective at node %d", goalNode.id)
-                        end
+                    local dist = (myPos - ent:GetAbsOrigin()):Length()
+                    if dist < closestDist then
+                        closestDist = dist
+                        goalNode = Navigation.GetClosestNode(ent:GetAbsOrigin())
+                        entity = ent
+                        Log:Info("Found objective at node %d", goalNode.id)
                     end
                 end
             else
