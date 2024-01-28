@@ -46,7 +46,7 @@ local Tasks = table.readOnly {
     Medic = 5,
 }
 
-local currentTask = Tasks.Follow
+local currentTask = Tasks.Objective
 local taskTimer = Timer.new()
 local Math = lnxLib.Utils.Math
 local WPlayer = lnxLib.TF2.WPlayer
