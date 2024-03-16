@@ -1,43 +1,56 @@
 local TaskManager = {}
 TaskManager.tasks = {}
+TaskManager.sortedIdentifiers = {}
 
-function TaskManager.addTask(func, delay, identifier)
+--- Adds a task to the TaskManager
+--- @param func function The function to be executed
+--- @param args table The arguments to pass to the function
+--- @param delay number The delay (in ticks) before the function should be executed
+--- @param identifier string A unique identifier for the task
+function TaskManager.addTask(func, args, delay, identifier)
     local currentTime = globals.TickCount()
+    args = args or {}
 
-    -- Check if the task already exists
     if TaskManager.tasks[identifier] then
-        -- If it does, just reset wasExecuted to false
+        -- Update existing task details (function, delay, args) but not lastExecuted
+        TaskManager.tasks[identifier].func = func
+        TaskManager.tasks[identifier].delay = delay or 1
+        TaskManager.tasks[identifier].args = args or {}
         TaskManager.tasks[identifier].wasExecuted = false
+        -- No need to re-insert into sortedIdentifiers or re-sort, as delay order hasn't changed
     else
-        -- If it doesn't, schedule the task for execution
+        -- Add new task
         TaskManager.tasks[identifier] = {
             func = func,
             delay = delay,
+            args = args,
             lastExecuted = currentTime,
-            wasExecuted = false -- Initially marked as not executed
+            wasExecuted = false,
         }
+        -- Insert identifier and sort tasks based on their delay, in descending order
+        table.insert(TaskManager.sortedIdentifiers, identifier)
+        table.sort(TaskManager.sortedIdentifiers, function(a, b)
+            return TaskManager.tasks[a].delay > TaskManager.tasks[b].delay
+        end)
     end
 end
 
-local function TickUpdate()
+function TaskManager.TickUpdate()
     local currentTime = globals.TickCount()
-    for identifier, task in pairs(TaskManager.tasks) do
+    for _, identifier in ipairs(TaskManager.sortedIdentifiers) do
+        local task = TaskManager.tasks[identifier]
         if not task.wasExecuted and currentTime - task.lastExecuted >= task.delay then
-            -- Task is due for execution
-            task.func() -- Execute the task
-            task.wasExecuted = true -- Mark as executed
-            task.lastExecuted = currentTime -- Update execution time
-        end
-
-        -- Remove tasks that were executed and their delay period has passed without being scheduled again
-        if task.wasExecuted and currentTime - task.lastExecuted >= task.delay then
-            TaskManager.tasks[identifier] = nil
+            -- Execute the task
+            task.func(table.unpack(task.args))
+            task.wasExecuted = true
+            -- Reset task data except for lastExecuted
+            task.func = nil
+            task.args = nil
+            task.delay = nil
+            -- Execute only the first eligible task per tick
+            return
         end
     end
 end
-
--- Simulate attaching to game's tick update or similar
-callbacks.Unregister("CreateMove", "LNX.Lmaobot.TaskManager.CreateMove")
-callbacks.Register("CreateMove", "LNX.Lmaobot.TaskManager.CreateMove", TickUpdate)
 
 return TaskManager
